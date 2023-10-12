@@ -2,3 +2,4 @@
 *.tsv
 *.png
 .Rproj.user
+.drawio
