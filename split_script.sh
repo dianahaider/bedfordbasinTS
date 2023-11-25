@@ -17,7 +17,7 @@ mkdir split_pipeline
 find . -type f | xargs perl -pi -e 's/\/home\/$USER/~/g'
 
 #copy all data separated by years, move each raw files into /year/00-raw/
-for file in *.fastq.gz; do mv "$file" "${file/_001.fastq.gz/.fastq.gz}"; done #rename so the script 
+for file in *.fastq.gz; do mv "$file" "${file/_001.fastq.gz/.fastq.gz}"; done #rename so the script to generate the manifest works
 
 #run 01, libgcc-ng, libstdcxx-ng only exist for Linux, for mac
 brew install gcc
@@ -55,7 +55,8 @@ pip install cutadapt
 find . -type f | xargs perl -pi -e 's/\/home\/$USER/~/g'
 
 #copy all data separated by years, move each raw files into /year/00-raw/
-for file in *.fastq.gz; do mv "$file" "${file/_001.fastq.gz/.fastq.gz}"; done #rename so the script 
+#rename so the script works
+for file in *.fastq.gz; do mv "$file" "${file/_001.fastq.gz/.fastq.gz}"; done 
 
 #run 01, libgcc-ng, libstdcxx-ng only exist for Linux, for mac
 brew install gcc
@@ -68,6 +69,10 @@ conda create -n cutadaptenv cutadapt
 #rawFileEndingR1=R1.fastq.gz
 #rawFileEndingR2=R2.fastq.gz
 nano ~/projects/def-rbeiko/dhaider/bb_data/split_pipeline/eASV-pipeline-for-515Y-926R/qiime2-2022.2-DADA2-SILVA138.1-PR2_4.14.0/00-trimming-sorting-scripts/00-run-cutadapt.sh
+#then run it
+sbatch ~/projects/def-rbeiko/dhaider/bb_data/split_pipeline/eASV-pipeline-for-515Y-926R/qiime2-2022.2-DADA2-SILVA138.1-PR2_4.14.0/00-trimming-sorting-scripts/00-run-cutadapt.sh
+
+#if working with size fractionated data, after cut adapt -- split into folders
 
 
 sbatch ~/projects/def-rbeiko/dhaider/bb_data/split_pipeline/eASV-pipeline-for-515Y-926R/qiime2-2022.2-DADA2-SILVA138.1-PR2_4.14.0/00-trimming-sorting-scripts/01-sort-16S-18S-bbsplit.sh 

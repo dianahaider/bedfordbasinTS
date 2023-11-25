@@ -86,7 +86,7 @@ fwd.sel <- ordiR2step(rda(speclr ~ 1, data = env.z), # lower model limit (simple
 
 
 # Write our new model
-spe.rda.signif <- rda(speclr ~ Temperature + month + Chlorophyll.A +
+spe.rda.signif <- rda(speclr ~ Temperature + conductivity + Chlorophyll.A +
                         oxygen + Nitrate + 
                         Phosphate , data = env.z)
 # check the adjusted R2 (corrected for the number of
@@ -113,6 +113,7 @@ legend("topleft", legend=unique(env$month), col=unique(env$month), pch= 15 )
 # Type 2 scaling
 ordiplot(spe.rda.signif, scaling = 2, type='n')
 points (spe.rda.signif, col = env$month, pch = as.integer(env$year))
+text(spe.rda.signif,display="cn",cex=.8,col="blue")
 legend("bottomright", legend=unique(env$year), pch=unique(env$year) )
 legend("topright", legend=unique(env$month), col=unique(env$month), pch= 15 )
 
