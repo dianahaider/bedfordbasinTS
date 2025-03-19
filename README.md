@@ -5,21 +5,7 @@ We determined the resistance and resilience of the microbial community in the Be
 ### Structure of the starting repository
 
 ```Working directory  
-└── Cloned repo  
-    ├── 00-raw  
-    │   └── raw_reads.fastq.gz  
-    ├── in-silico-mocks  
-    │   └── 02-EUKs/02-PROKs  
-    │          └── Even/Staggered  
-                      ├── clone_names.tsv
-    │                 └── reads.fastq  
-    ├── generate_data.sh
-    ├── run_analysis.ipynb
-    ├── environment.yml
-    ├── MANIFEST.tsv
-    └── METADATA.tsv
-
-project_root/
+root/
 ├── data/
 │   ├── raw/
 │   │  └── raw_reads.fastq.gz  
