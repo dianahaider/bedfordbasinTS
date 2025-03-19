@@ -1,19 +1,19 @@
 # Install the required packages
-install.packages("vegan")
-install.packages("labdsv")
-install.packages("MASS")
-install.packages("ggplot2")
-if (!require("BiocManager", quietly = TRUE))
-  install.packages("BiocManager")
-BiocManager::install(version = "3.17")
-library(BiocManager)
-BiocManager::install("microbiome")
+#install.packages("vegan")
+#install.packages("labdsv")
+#install.packages("MASS")
+#install.packages("ggplot2")
+#if (!require("BiocManager", quietly = TRUE))
+#  install.packages("BiocManager")
+#BiocManager::install(version = "3.17")
+#BiocManager::install("microbiome")
 
 # install mvpart from package archive file
-install.packages("remotes")
+#install.packages("remotes")
 remotes::install_url("https://cran.r-project.org/src/contrib/Archive/mvpart/mvpart_1.6-2.tar.gz")
 
 # Load the required packages
+library(BiocManager)
 library(labdsv)
 library(vegan)
 library(MASS)
@@ -22,10 +22,10 @@ library(ggplot2)
 library(microbiome)  
 
 # Import df of samples x features
-spe <- read.csv("data/shallowdfs.csv", row.names = 1)
+spe <- read.csv("data/subyears_tables.csv", row.names = 1)
 
 #Import env data
-env <- read.csv("data/env_data_shallow_clean.csv", row.names = 1)
+env <- read.csv("data/env_data_deep.csv", row.names = 1)
 
 dim(spe) # dataset dimensions
 
@@ -86,7 +86,7 @@ fwd.sel <- ordiR2step(rda(speclr ~ 1, data = env.z), # lower model limit (simple
 
 
 # Write our new model
-spe.rda.signif <- rda(speclr ~ Temperature + conductivity + Chlorophyll.A +
+spe.rda.signif <- rda(speclr ~ Temperature_y + conductivity + Chlorophyll.A +
                         oxygen + Nitrate + 
                         Phosphate , data = env.z)
 # check the adjusted R2 (corrected for the number of
@@ -102,6 +102,7 @@ anova.cca(spe.rda.signif, step = 1000, by = "axis")
 
 
 env$year <- as.factor(env$year)
+View(env)
 
 # Type 1 scaling
 ordiplot(spe.rda.signif, scaling = 1, type='n')
@@ -116,6 +117,17 @@ points (spe.rda.signif, col = env$month, pch = as.integer(env$year))
 text(spe.rda.signif,display="cn",cex=.8,col="blue")
 legend("bottomright", legend=unique(env$year), pch=unique(env$year) )
 legend("topright", legend=unique(env$month), col=unique(env$month), pch= 15 )
+
+
+
+Bedford_clr <- microbiome::transform(Bedford_no_mito, "clr")   
+out.pcoa.logt <- ordinate(Bedford_clr, method = "RDA", distance = "euclidean")
+evals <- out.pcoa.logt$CA$eig
+p3<-plot_ordination(Bedford_clr, out.pcoa.logt, type = "Sample", 
+                    color = "Month" ) 
+
+
+
 
 
 ################

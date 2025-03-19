@@ -5,7 +5,7 @@ git clone https://github.com/jcmcnch/eASV-pipeline-for-515Y-926R.git
 chmod a+x ./*
 
 #change qiime version used in code to 2023.2
-find . -type f | xargs perl -pi -e 's/qiime2-2019.4/qiime2-2023.2/g'
+find . -type f | xargs perl -pi -e 's/qiime2-2023.5/qiime2-2023.2/g'
 
 #setup from README from pipeline
 cd eASV-pipeline-for-515Y-926R/
