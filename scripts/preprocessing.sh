@@ -1,17 +1,9 @@
-### Data transfer to compute canada for analysis
-Raw fastq reads  are located in the workstation + compute canada RSYNC. Make sure the data is formatted correctly, and fastq files are separated by year.
-```bash
-#from remote to local
 
-#from local to compute can.
-```
 
 ### Script uploads from github
 
 Log in to compute canada, bbmap-env is already installed on the server
-```bash
-ssh -Y dhaider@narval.computecanada.ca
-```
+
 
 Clone the repository for the analysis of the primers fastq files
 ```bash
@@ -28,6 +20,3 @@ and add bioconda and pytorch channel to successfully install conda envs
 ```bash
 find . -type f | xargs perl -pi -e 's/\/home\/$USER/~/g'
 ```
-
-#copy all data separated by years, move each raw files into /year/00-raw/
-
