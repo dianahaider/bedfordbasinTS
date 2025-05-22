@@ -47,9 +47,10 @@ singularity exec -B $PWD:PATH -B 2017:/outputs \
 
 wget https://data.qiime2.org/2023.5/common/silva-138-99-nb-classifier.qza
 
-singularity --mem=16GB exec -B $PWD:PATH -B 2014:/outputs \
-  -B 2014/dada2_output:/inputs -B 2014:/class qiime2-2023.2.sif \
+singularity exec -B $PWD:PATH -B 2021:/outputs \
+  -B 2021/dada2_output:/inputs -B 2021:/class /lustre06/project/6001026/dhaider/bb_data/split_pipeline/qiime2-2023.5.sif \
   qiime feature-classifier classify-sklearn --i-reads /inputs/representative_sequences.qza --i-classifier /class/silva-138-99-nb-classifier.qza --output-dir /outputs/taxa --verbose
+
 
 #from local
 qiime feature-table summarize --i-table dada2_output_270210/table.qza --o-visualization dada2_output_270210/dd2270210_table_summary.qzv

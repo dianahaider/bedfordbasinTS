@@ -93,22 +93,66 @@ def consolidate_tables(year=all):
             df = df[cols]
             df['table_path'] = [table_path] * df.shape[0]
             df['sample_name'] = df['sample_name'].str.replace('-', '.')
-            dataframes.append(df)
+            df['sample_name'] = df['sample_name'].str.replace(r'^V4V5\.', '', regex=True)
 
-            # Adding table_id, forward and reverse trim columns
-            #df['table_id'] = str(table_path.split('/')[-3]) #add a table_id column
-            #df['forward_trim'], df['reverse_trim'] = df['table_id'].str.split('R', 1).str
-            #df['forward_trim'] = df['forward_trim'].map(lambda x: x.lstrip('F'))
-            #df["forward_trim"] = pd.to_numeric(df["forward_trim"])
-            #df["reverse_trim"] = pd.to_numeric(df["reverse_trim"])
+            sample_names = df['sample_name'].astype(str)
+            parts = sample_names.str.extract(r'^([^\.]+)\.([^\.]+)')
+            df['nouveau'] = parts[0] + '.' + parts[1]
+            dataframes.append(df)
 
     #Stick all the dataframes together
     #outputfile="merged_all_tables.tsv"
     df = pd.concat(dataframes)
+
+    #we have some problematic sample names
+    df.nouveau = df.nouveau.replace({'BB19.35CSb': 'BB19.35CS', 'BB19.35BSb': 'BB19.35BS'})
+    df['nouveau'] = df['nouveau'].str.replace(r'\.a(\d{1,2}[A-Za-z]{1,2})', r'.\1', regex=True)
     #df.to_csv(comm+'/merged_all_tables.tsv', sep='\t', index=False)
     print("Successfully saved all tables.")
     return df
 
+def decorticate_sampleid (df, samplecol='sample_name'):
+    #define dict for depth_code
+    depth_num = {
+        "A": 1,
+        "B": 5,
+        "C": 10,
+        "D": 60,
+        "E": 30
+    }
+
+
+    df = df[['nouveau', 'feature_id', 'feature_frequency']].copy()
+    df.rename(columns={'nouveau':'sample_name'}, inplace=True)
+    df['sample_name'] = df['sample_name'].str.replace(r'\.0(\d)', r'.\1', regex=True) #remove the leading zero
+
+    df = df[df.feature_frequency != 0] #remove null rows
+
+    # This regex first looks for 'SL', then 'S', then 'L'. If none is found, we fill with 'W'.
+    df["size_code"] = df[samplecol].str.extract(r'(SL|S|L)')
+    df["size_code"] = df["size_code"].fillna('W')
+
+    df["depth_code"] = df[samplecol].str.extract(r'[1-9][0-9]?([A-E])')
+    df['depth']= df['depth_code'].map(depth_num)
+    df["weekn"] = df[samplecol].str.extract(r'\.([1-9][0-9]?)[A-E]')
+    df['weekn'] = pd.to_numeric(df['weekn'])
+    df['depth'] = pd.to_numeric(df['depth'])
+
+    df['Total'] = df['feature_frequency'].groupby(df[samplecol]).transform('sum')
+    df['ratio'] = df['feature_frequency']/df['Total']
+    df['nASVs'] = df['feature_id'].groupby(df[samplecol]).transform('count')
+    df['weekdepth'] = df["weekn"].astype(str) + df["depth"].astype(str)
+    df['avg'] = df['nASVs'].groupby(df['weekdepth']).transform('mean')
+    df['diff'] = df['nASVs'] - df['avg']
+
+    df["year"] = '20' + df[samplecol].str.extract(r'BB(\d{2})(?=\.)')
+    df['datetime'] = pd.to_datetime(
+    df['year'].astype(str) + '-W' + df['weekn'].astype(int).astype(str) + '-1',
+    format='%Y-W%W-%w')
+
+    df=df.rename(columns={samplecol: "sampleid"})
+
+    return df
 
 def merge_metadata(df, all_md):
     #df = pd.read_csv('02-PROKs/'+'/merged_all_tables.tsv', sep='\t')
@@ -263,7 +307,7 @@ def make_defract(all_md, separated):
 
     #drop unecessary columns which might rise merging conflicts
     sep_SLRA = sep_SLRA.drop(['feature_frequency', 'Total', 'ratio', 'nASVs', 'weekdepth', 'avg',
-                              'diff', 'extraction_date', '[DNA]ng/uL', 'A260/280',
+                              'diff', '[DNA]ng/uL',
                               'Newfeature_frequency'], axis=1)
     sep_SLRA.rename(columns={'Newff':'feature_frequency'}, inplace=True)
     sep_SLRA = sep_SLRA.drop_duplicates()
@@ -761,3 +805,150 @@ def taxbarplot_by_year(comm, table, level, depth, topn, include_other=True):
         fig.show()
 
     return figures
+
+
+
+def taxo_barplot(df, tax_level, topn=10, order='most',
+                 abundance_col='feature_frequency', week_col='weekn'):
+
+    df = df.copy()
+
+    df[week_col] = pd.to_numeric(df[week_col], errors='coerce')
+
+    tax_sum = df.groupby(tax_level)[abundance_col].sum().reset_index()
+    if order == 'most':
+        tax_sum = tax_sum.sort_values(abundance_col, ascending=False)
+    elif order == 'least':
+        tax_sum = tax_sum.sort_values(abundance_col, ascending=True)
+    else:
+        raise ValueError("order must be either 'most' or 'least'")
+
+    top_taxa = tax_sum[tax_level].head(topn).tolist()
+
+    df['tax_plot'] = df[tax_level].where(df[tax_level].isin(top_taxa), 'Other')
+
+    total_per_week = df.groupby(week_col)[abundance_col].sum().reset_index().rename(columns={abundance_col: 'total'})
+
+    # Aggregate data by week and tax_plot (summing abundance)
+    df_weekly = df.groupby([week_col, 'tax_plot'])[abundance_col].sum().reset_index()
+    df_weekly = df_weekly.merge(total_per_week, on=week_col)
+
+    # Calculate relative abundance (this will be between 0 and 1)
+    df_weekly['relative_abundance'] = df_weekly[abundance_col] / df_weekly['total']
+
+    # Remove the "Other" category from plotting
+    df_weekly_filtered = df_weekly[df_weekly['tax_plot'] != 'Other'].copy()
+
+    df_weekly_filtered.sort_values(week_col, inplace=True)
+
+    fig = px.bar(
+        df_weekly_filtered,
+        x=week_col,
+        y='relative_abundance',
+        color='tax_plot',
+        title=f'Taxonomic Bar Plot at {tax_level} Level (Top {topn} {order} abundant) by Week',
+        labels={'relative_abundance': 'Relative Abundance', week_col: 'Week'}
+    )
+
+    fig.update_layout(xaxis=dict(type='linear'))
+
+    return fig
+
+
+def make_news_memory_efficient(separated):
+
+    # Convert key columns to categorical to save memory
+    for col in ['size_code', 'weekn', 'depth', 'year']:
+        if separated[col].dtype != 'category':
+            separated[col] = separated[col].astype('category')
+
+    # Filter rows that are used in subsequent operations and drop unwanted columns early
+    mask = ~separated['size_code'].isin(["W", "P"])
+    sep_SL = separated.loc[mask].copy()
+
+    sample_dna = sep_SL[['sampleid', 'weekn', 'depth', 'year', '[DNA]ng/uL']].drop_duplicates('sampleid')
+
+    group_sum = sample_dna.groupby(['year', 'weekn', 'depth'], observed=True)['[DNA]ng/uL'].sum().reset_index()
+
+    group_sum.rename(columns={'[DNA]ng/uL': '[DNAt]'}, inplace=True)
+
+    sep_SL = sep_SL.merge(group_sum, on=['year', 'weekn', 'depth'], how='left')
+    sep_SL['DNApr'] = sep_SL['[DNA]ng/uL'] / sep_SL['[DNAt]']
+
+    # Prepare a minimal lookup DataFrame for merging; drop duplicates immediately
+    merge_df = sep_SL[['sampleid', 'DNApr', '[DNAt]']].drop_duplicates()
+
+    # Free memory from sep_SL if not needed further
+    del sep_SL
+
+    # Merge back with the original DataFrame using a lightweight lookup table
+    sepSLRA = separated.merge(merge_df, on='sampleid', how='left')
+
+    # Drop rows not needed and filter further in place
+    sepSLRA = sepSLRA.loc[~sepSLRA['size_code'].isin(["W", "P"])].copy()
+
+    # Compute corrected feature frequency with groupby, then drop the intermediate column
+    sepSLRA['Newfeature_frequency'] = sepSLRA['feature_frequency'] * sepSLRA['DNApr']
+    sepSLRA['Newff'] = sepSLRA.groupby(['feature_id', 'weekn', 'depth', 'year'], observed=True)['Newfeature_frequency'].transform('sum')
+
+    # Update sampleid and set size_code in one step
+    sepSLRA['sampleid'] = "BB22." + sepSLRA['weekn'].astype(str) + sepSLRA['depth_code'] + "SL"
+    sepSLRA['size_code'] = 'SL'
+
+    # Drop unneeded columns early
+    cols_to_drop = ['feature_frequency', 'Total', 'ratio', 'nASVs', 'weekdepth', 'avg', 'year',
+                    'diff', '[DNA]ng/uL', 'Newfeature_frequency']
+    sepSLRA.drop(columns=cols_to_drop, inplace=True, errors='ignore')
+    sepSLRA.rename(columns={'Newff': 'feature_frequency'}, inplace=True)
+    sepSLRA.drop_duplicates(inplace=True)
+
+    # Calculate totals and ratios in place
+    sepSLRA['Total'] = sepSLRA.groupby('sampleid', observed=True)['feature_frequency'].transform('sum')
+    sepSLRA['ratio'] = sepSLRA['feature_frequency'] / sepSLRA['Total']
+    sepSLRA['nASVs'] = sepSLRA.groupby('sampleid', observed=True)['feature_id'].transform('nunique')
+    sepSLRA.drop_duplicates(inplace=True)
+
+    # Process other groups; filtering only when needed
+    sep_WO = separated.loc[separated['size_code'] == "W"].drop_duplicates().copy()
+    sep_PO = separated.loc[separated['size_code'] == "P"].drop_duplicates().copy()
+    sep_S  = separated.loc[separated['size_code'] == "S"].copy()
+    sep_L  = separated.loc[separated['size_code'] == "L"].copy()
+
+    # Reset indices without creating extra copies
+    sep_WO.reset_index(drop=True, inplace=True)
+    sepSLRA.reset_index(drop=True, inplace=True)
+
+    # Concatenate all parts at once
+    newseparated = pd.concat([sepSLRA, sep_WO, sep_PO, sep_L, sep_S], ignore_index=True)
+
+    # Compute combined columns and group statistics
+    newseparated['weekdepth'] = newseparated["weekn"].astype(str) + newseparated["depth"].astype(str)
+    newseparated['avg'] = newseparated.groupby('weekdepth', observed=True)['nASVs'].transform('mean')
+    newseparated['diff'] = newseparated['nASVs'] - newseparated['avg']
+    newseparated["rank"] = newseparated.groupby("sampleid", observed=True)["ratio"].rank(method="average", ascending=False)
+    newseparated["ranktot"] = newseparated['rank'] / newseparated['nASVs']
+
+    # Calculate shannon diversity index per sample (assuming shannon is defined)
+    diversity = newseparated.groupby('sampleid', observed=True)['feature_frequency'].apply(lambda freqs: shannon(freqs))
+    newseparated['shannon_diversity'] = newseparated['sampleid'].map(diversity)
+
+    # For DNA concentration in SL, compute and merge as needed
+    cleaned_data = newseparated.drop_duplicates(subset=["weekn", "depth", 'year', "size_code", "[DNA]ng/uL"])
+    sl_fill_values = (
+        cleaned_data.loc[cleaned_data["size_code"].isin(["S", "L"])]
+        .groupby(["weekn", "depth", 'year'], observed=True)["[DNA]ng/uL"]
+        .sum()
+        .reset_index()
+    )
+    sl_fill_values["size_code"] = "SL"
+
+    newseparated = newseparated.merge(
+        sl_fill_values,
+        on=["weekn", "depth", 'year', "size_code"],
+        how="left",
+        suffixes=('', '_fill')
+    )
+    newseparated.loc[newseparated["[DNA]ng/uL"].isna(), "[DNA]ng/uL"] = newseparated.loc[newseparated["[DNA]ng/uL"].isna(), "[DNA]ng/uL_fill"]
+    newseparated.drop(columns=["[DNA]ng/uL_fill"], inplace=True)
+
+    return newseparated

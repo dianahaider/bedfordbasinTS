@@ -64,6 +64,8 @@ brew install gcc
 conda create -n cutadaptenv cutadapt
 #remove the '.' from .R1 and .R2 in 515FY926R.cfg
 
+#change file names so we remove the "matched"
+for f in *_matched.fastq.gz; do   echo mv -- "$f" "${f/_matched/}"; done
 
 #edit the script to add the variables and to specify
 #rawFileEndingR1=R1.fastq.gz
