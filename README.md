@@ -36,8 +36,8 @@ root/
 ### Datasets
 | Dataset       | Community     | Link | 
 | ------------- | ------------- |------|
-| Sequencing    | Even          |
-| METADATA      | Staggered     |
+| Sequencing    |           |
+| METADATA      |      |
 
 ### Generate the data
 Run ```preprocessing.sh``` and ```generate_data.sh``` from the cloned repo, then open the scripts in order and run all.
